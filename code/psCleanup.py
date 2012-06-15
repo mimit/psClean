@@ -1,3 +1,4 @@
+# coding=utf8
 ############################
 ## Author: Mark Huberty, Mimi Tam, and Georg Zachmann
 ## Date Begun: 23 May 2012
@@ -32,3 +33,101 @@
 ## either expressed or implied, of the FreeBSD Project.
 ############################
 
+import re
+import unicodedata
+
+##Some subfunction stubs
+def stdizeCase(string): 
+    """Subfunction for string cleaning; Returns a string with all lowercase converted to uppercase characters"""
+    result = string.upper()
+    return result
+
+def remDiacritics(string):
+    """Subfunction for string cleaning; Returns a unicode String cleaned of accentmarks (diacritics)"""
+    
+    #Need to double check this "Casting" for potential problems!
+    s = unicode(string)
+    result = ''.join((c for c in unicodedata.normalize('NFD',s) if unicodedata.category(c) !='Mn'))
+    return result
+
+def remTrailSpaces(string):
+    """Subfunction for string cleaning; Returns a string with trailing spaces removed"""
+    s = string.strip()
+    return s
+
+#a sort of main function
+def masterCleanDicts(input_string, cleanup_dicts):
+    for k, v in enumerate(cleanup_dicts):
+        cleanup_dicts[k] = makeRegex(v)
+        
+    output_string = input_string
+    for cleanupdict in cleanup_dicts:
+        output_string = multReplace(output_string, cleanupdict)
+    
+    return output_string  
+
+def multReplace(input_string, regex_dict):
+    output_string = input_string
+    for k, v in regex_dict.iteritems():
+        output_string = v.sub(k, output_string)
+    return output_string
+
+def makeRegex(input_dict):
+    regex_dict = {}
+    for k, v in input_dict.iteritems():
+        if isinstance(v, str):
+            regex_dict[k] = re.compile(v)
+        elif isinstance(v, list):
+            expression = '|'.join(v)
+            regex_dict[k] = re.compile(expression)
+        else:
+            raise ## Throw an error
+    return regex_dict
+
+
+
+#Dictionaries used for cleaning
+#IMPORTANT NOTE: These all assume that case standardization has already been performed!
+
+#Get rid of HTML tags. For extendability using dictionary. However, per Magerman et al 2006, only HTML tags were <BR>, we should validate  
+convertHTML = {' ': r'<\s*BR\s*>' #break 
+               }
+
+#Get rid of SGML tags. Per Magerman et al 2006, only 7 SGML tags were identified in the data. We should validate   
+convertSGML = {'&': r'&AMP;',
+               'Ó': r'&OACUTE;',
+               '§': r'&SECT;', 
+               'Ú': r'&UACUTE;',
+               ' ': r'&#8902;', 
+               '.': r'&BULL;',
+               '!': r'&EXCL;'
+               }
+
+#Commas and periods near numbers do not need spaces, otherwise periods and commas have one space after
+commaPeriod = {'.': r'(?<=\d)(\s*\.\s*)(?=\d)', # 12345_._54321
+               ',': r'(?<=\d)(\s*,\s*)(?=\d)', # 12345_,_54321  
+               '. ': r'(?<=[a-zA-Z])(\s*\.\s*)(?=[a-zA-Z])', # abc_._abc
+               ', ': r'(?<=[a-zA-Z])(\s*,\s*)(?=[a-zA-Z])' # abc_,_abc 
+               }
+
+#Remove all non alphanumeric or concatenator symbols
+cleanSymbols = {'': r'[^\s\w,.;:-]'
+                }
+
+#spaces must be single
+singleSpace = {' ':r'\s+' 
+               }
+
+#translate all "ands" to other languages... for a more sophisticated version, we should use country codes because it can be dangerous to delete some of the shorter ones such as "I"...
+ampersand = { '&' : [r'\sAND\s',r'\sEN\s',r'\sDHE\s',r'\svə\s',r'\sETA\s',r'\sI\s',r'\sи\s',r'\sA\s',r'\sOG\s',r'\sKAJ\s',r'\sJA\s',r'\sAT\s',r'\sET\s',r'\sE\s',r'\sUND\s',r'\sAK\s',r'\sES\s',r'\sDAN\s',r'\sAGUS\s',r'\sUN\s',r'\sIR\s',r'\sU\s',r'\sSI\s',r'\sIN\s',r'\sY\s',r'\sNA\s', r'\sOCH\s',r'\sVE\s',r'\sVA\s', r'\sSAMT\s'] 
+             }
+#Quotation marks (",') at b3eginning and end of line removed
+quotationMarks = {'': r'^["\']|["\']$'
+                  }
+
+#TEMPORARY TEST AREA
+teststring10 = "500    . 19    50 <br>help me I'm a fire<br>ant 5<BR>er8<br>0<BR> < BR > <   BR > lkad </BR> < /BR > <br> <bR> <sfs  BR> <  lsks BR lls > a< Br>b abc"
+teststring11 = "\"1 &AMP;2&aMpP; 3 & AMP ; \"\"\"&AMP; &aMp; &amp; &oacute; &OACUTE; &SECT; &sEcT; & s e c t;\"\""
+teststring12 = "\'hola \'mundo\'"
+dictlist=[convertHTML,convertSGML,quotationMarks]
+print masterCleanDicts(teststring12, dictlist)
